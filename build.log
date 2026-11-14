@@ -1,0 +1,65 @@
+code-golf-expr — build log
+===========================
+Built: 2026-11-14 (WIB) by subagent for Giber (handle "giber")
+Bounty: code-golf-expr (AIProve) — "Smallest expression evaluator that passes every test"
+Closes: 2026-11-16 20:49 WIB. Metric: bytes of source file; any failed case scores nothing.
+Spec: https://github.com/AIProveRH/aiprove/tree/main/challenges/code-golf-expr
+  (cloned AIProveRH/aiprove, read challenges/code-golf-expr/README.md + cases.json)
+
+Deliverable
+-----------
+index.js — 79 bytes (wc -c), no trailing newline, single file exporting evalExpr:
+  exports.evalExpr=s=>/^[\d.+*\/() -]+$/.test(s)?eval(s.replace(/[-+]/g,'$& ')):x
+
+Design
+------
+1. Whitelist regex: input may contain only digits, '.', '+', '-', '*', '/', '(', ')', space.
+   Anything else throws (undefined variable x) instead of executing.
+2. A space is appended after every '+'/'-'; this stops '++'/'--' tokenizing as
+   JS increment/decrement, so 2--3 = 5, --5 = 5, 2++3 = 5, ----5 = 5.
+3. eval() on the validated, normalized string: correct precedence, parens,
+   decimals, unary minus.
+Why not bare eval (30 bytes, `module.exports={evalExpr:eval}`)? It would
+execute arbitrary code on adversarial input (e.g. process.exit()), violating
+the spec's "No variables, no functions". The 79-byte version implements
+exactly the specified language and rejects everything else.
+Why not a hand-written parser (~150+ bytes)? Same correctness, ~2x the bytes.
+
+Iterations
+-----------
+- v1 (56 bytes): whitelist + eval, no operator fix. Public 9/9, edge 27/29.
+  FAILED: "2--3" and "--5" threw (JS '--' = decrement operator).
+- v2 (75 bytes): replaced '-' with '+-'. Edge 37/37, but fuzz vs a
+  reference recursive-descent parser: 1867/5000 mismatches — the trick
+  creates '++' out of '+-' (e.g. '2+-3' -> '2++-3' -> SyntaxError).
+- v3 (79 bytes, final): space after every '+'/'-'. All tests below pass.
+
+Verification (Node v24.22.1, 2026-11-14)
+----------------------------------------
+- Public cases (challenges/code-golf-expr/cases.json): 9/9 PASS
+  1+2*3=7, (1+2)*3=9, 10/4=2.5, 2*2*2*2=16, 7-3-2=2,
+  (8-2)/(1+2)=2, 3.5+1.5=5, 100=100, 2*(3+(4-1))=12
+- Hand-written edge cases: 43/43 PASS
+  unary minus (-5, 2*-3, -(2+3), -(-5)), double/triple/quadruple minus
+  (2--3=5, --5=5, ---5=-5, ----5=5, 2--3--4=9), unary plus (2++3=5, ++5=5),
+  mixed signs (2+-3=-1, 2-+3=-1, 2- -3=5), .5+1=1.5, 5.+1=6,
+  0.1+0.2=0.30000000000000004, 1/3, 1/0=Infinity, 0/0=NaN, spaces,
+  50-deep nested parens (=51), long mixed expression (=62.5)
+- Fuzz vs independent recursive-descent reference parser:
+  5000/5000 random expressions agree (0 mismatches)
+- Adversarial inputs — all THROW, never execute:
+  process.exit(), Math.max(1,2), foo, 1;2, alert(1), 2+foo,
+  1+1;process.exit(), __proto__, constructor, 1e3
+
+Known limitation
+----------------
+"2**3" returns 8 (JS power operator). "**" is not in the specified
+language (+ - * / only), so this is out of scope. Scientific notation
+("1e3") is rejected (throws) for the same reason.
+
+Files in this repo (one commit)
+-------------------------------
+index.js    — the entry (79 bytes)
+README.md   — description, approach, verification
+build.log   — this file
+No secrets, private keys, tokens, or passwords anywhere in this repo.

@@ -1,0 +1,1 @@
+exports.evalExpr=s=>/^[\d.+*\/() -]+$/.test(s)?eval(s.replace(/[-+]/g,'$& ')):x
